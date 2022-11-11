@@ -1,0 +1,608 @@
+---
+title: 'BS31005: QTL Mapping and GWAS Workshop'
+author: "James Abbott"
+date: "11/11/2022"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 100
+---
+
+# BS31005: QTL Mapping and GWAS Workshop
+
+Run the setup code chunk below to initialise the R session and load the required libraries.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+if (!requireNamespace("farver", quietly = TRUE)) {
+    install.packages("farver")
+}
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    install.packages("ggplot2")
+}
+if (!requireNamespace("qtl", quietly = TRUE)) {
+    install.packages("qtl")
+}
+
+library(ggplot2)
+library(qtl)
+
+data('hyper')
+
+```
+
+## Provided Data
+
+The data for this exercise is provided in a number of CSV files:
+
+-   `heights.csv`: The heights of 500 people, as a single column
+
+-   `bristle_length.csv`: *Drosophila* flies have bristles on their abdomen, which were measured in
+    the a number of mothers, and all their offspring. This CSV file contains two columns - the first
+    is the average bristle length of the mother, and the second is the average bristle length of all
+    her offspring.
+
+-   `pollen_shed_expt.csv`: This contains the results of an investigation into pollen shedding in
+    maize, where the number of days between planting and pollen being shed investigated in 10 inbred
+    maize lines, with each line grown in three different environments
+
+## Data Loading
+
+Load each of the provided CSV files into a data frame using your preferred method - you may locate
+the files in the file browser, click the file name and select `Import Dataset…`, or select 'Import
+Dataset' from the `file` menu, or for the really adventurous, try using the read_csv function
+directly i.e.
+
+```{r}
+heights<-read.csv('heights.csv')
+```
+
+If you use the 'read.csv' function, name the data frames with the same name as the CSV files, jut
+without the `.csv` suffix, such as in the above example using `heights`.
+
+In the case of `heights`, this single column of data is more useful held as a list rather than a
+data-frame of one column, so we can extract this column into a list:
+
+```{r}
+heights<-heights[[1]]
+```
+
+## Working through this document
+
+You will find a number of empty or partially completed code cells throughout this RMarkdown
+document. As you work through the document it will ask you to carry out certain tasks, which are
+bullet-pointed text in bold. Enter the code for each of these in the code chunk beneath the relevant
+set of instructions, then click the green 'play' triangle icon in the top right corner of the code
+chunk.
+
+## Summary Statistics
+
+The statistical methods discussed in the lecture are needed for these examples. Although the
+equations look complex, they are actually relatively straightforward to use since R will do the hard
+work for us.
+
+We will just be using the `mean()`, `rowMeans()`, `colMeans()`, `var()`, `cov()` and `cor()`
+functions. The first section of the workshop will either introduce you to these, or be a bit of a
+reminder if you are already familiar with them.
+
+### Mean
+
+The mean of a set of values is formally expressed as$$\bar{X}=\frac{1}{n}\sum_{i=1}^{n} X_i$$
+
+which translates as the more human readable
+
+$$\bar{X}=\frac{X_1 + X_2 ...X_n}{n}$$
+
+In R, we just need to call the `mean()` function and pass it the data we want to find the mean of as
+an argument, and the calculation is done for us.
+
+-   **Call the `mean()`** **function and pass it the `heights` list**
+
+```{r mean}
+
+```
+
+If we are working with data in a data frame, We can find the mean of the rows with `rowMeans` and
+the mean of the columns with `colMeans`.
+
+-   Call the `rowMeans()` function and pass it the `bristle_length` data frame. This will return the
+    results as a list.
+
+```{r df_rowmeans}
+
+```
+
+-   **Similarly, call `colMeans()` and pass it the `bristle_length` data frame.** This time the
+    results will be returned as a named list
+
+```{r df_colmeans}
+
+```
+
+### Variance
+
+Variance, a measure of how far values are spread from the mean, is calculated as:
+$$V_x = \frac{1}{n}\sum_{i}(X_i-\bar{X})^2$$ Similarly, R can do the hard work for use with the
+`var()` function.
+
+-   **Call the `var()` function, passing it the `heights` list.**
+
+```{r variance}
+
+```
+
+### Covariance
+
+Covariance is a measure of the joint variability of two variables.
+$$COV_x,_y = \frac{1}{n}\sum_{i}(X_i-\bar{X})(Y_i-\bar{Y})$$ Since this is a comparison between two
+variables, we need to provide it with two sets of variables. In our case we can do this with the
+`bristle_length` data frame. If we pass a data frame to the `cov()` function it will determine the
+covariance between all possible combinations of the columns of the data frame, and return the
+results as a matrix.
+
+-   **Call the `cov()` function and pass it the bristle_length data frame.**
+
+```{r covariance}
+
+```
+
+We can also obtain the covariance of a single combination of variable by providing the `cov()`
+function with two vectors, or columns of data from the data frame (i.e. `bristle_length$mother`).
+
+-   Call the `cov()` function, passing it the `mother` and `offspring_mean` columns as two separate
+    arguments i.e. `cov(column1, column2)`
+
+```{r covariance_of_vectors}
+
+```
+
+### Broad-Sense Heritability
+
+This exercise is based on the example in Introduction to Genetic Analysis (Griffiths, Doebley,
+Peichel and Wassarman. 12th Edition p.653)
+
+The data in the `pollen_shed_expt.csv` file is a data frame containing the results of an experiment
+to investigate pollen shedding time in Maize. The number of days between planting and pollen being
+shed was recorded for 10 inbred maize lines, in 3 separate environments. This data allows us to look
+at the effect of genetic variation between lines, and also environmental variation between the three
+different environments.
+
+Broad-sense heritability (representing the proportion of phenotypic variation resulting from genetic
+factors relative to the total phenotypic variation) can be determined using the equation
+
+$$
+H_2 = \frac{V_g}{V_x}
+$$
+
+where $V_g$ represents the phenotypic variance due to genetic factors, and $V_x$ represents the
+total phenotypic variance. $V_x$ can itself be broken down into the contributions from $V_g$ and
+also environmental factors, represented by $V_e$, thus
+
+$$
+H_2 = \frac{V_g}{V_g + V_e}
+$$
+
+We therefore need to determine $V_g$ and $V_e$ for our data. Using the `pollen_shed_expt1` data,
+
+Firstly, we can use the `colMeans()` and `rowMeans()` functions to find the means of the rows and
+columns in our data frame, which represent the mean value for the environments and lines
+respectively.
+
+-   **Complete the code cell below to capture the environment means and line means**
+
+```{r broad-sense2}
+environment_means<-
+line_means<-
+```
+
+Next, we can determine the genetic variance ($V_g$) and environmental mean ($V_e$) from these
+vectors of mean values.
+
+-   **Call the `var()` function on each of these lists of mean values, storing the results of the
+    function called with `line_means` as `Vg` and the `environment_means` results as `Ve`.**
+
+```{r broad-sense3}
+Vg<-
+Ve<-
+```
+
+Since $V_x = V_g + V_e$ and have now determined these values, which can find $V_x$ by adding these
+values together
+
+-   Complete the following code chunk to determine $V_x$
+
+```{r}
+Vx<-
+```
+
+Now we can put these values into the broad-sense heriditary equation $$
+H_2 = \frac{V_g}{V_x}
+$$
+
+-   Complete the following code cell to determine $H_2$ and print out the result. Note that R uses
+    the `/` operator for division
+
+```{r broad-sense4}
+
+H2<-
+H2
+
+```
+
+Does the environment or genetic effects constitute the main source of variance in this data set?
+
+### Narrow-sense heritability
+
+Narrow-sense heritability is the ratio of the additive genetic variance to the total variance:
+
+$$h^2 = \frac{V_a}{V_x} = \frac{2COV_{p,o}}{V_x}$$
+
+This example uses the results of a study measuring abdominal bristle length in Drosophila. The
+length of the bristles of each mother fly were measured, as were those of all the offspring of the
+mother, which you should already have loaded from the `bristle_length.csv` file.
+
+```{r narrow-sense1, eval=FALSE, include=FALSE}
+View(bristle_length)
+```
+
+Plotting this as a scatter plot and fitting a linear regression line suggests there is a
+relationship between the bristle length in the mothers and their offspring. This plot is produced
+using a more advanced graphing library (ggplot2) than you may be used to - don't worry about the
+code here, just the output!
+
+```{r narrow-sense2}
+ggplot(bristle_length,aes(x=mother,y=offspring_mean))+
+  geom_point()+
+  theme_bw()+
+  xlab("Mother's bristle length")+
+  ylab('Mean offspring bristle length')+
+  geom_smooth(method='lm')
+```
+
+We can see how tightly linked these two sets of values are by finding the Pearson correlation
+coefficient, using the `cor` function.
+
+```{r narrow-sense3}
+cor(bristle_length)
+```
+
+A correlation coefficient of 1 would indicate the two sets of data were very tightly associated with
+each other, while a coefficient of -1 would indicate they have an inverse relationship.
+Unsurprisingly (and perhaps reassuringly!) the correlation coefficient of the mother:mother and
+offspring_mean:offspring_main combinations are 1.
+
+The key to determining $h^2$ is determining the value of $V_x$ (the total phenotypic variation) and
+the covariance between the parents and offspring ($COV_{p,o}$).
+
+-   **Complete the following code chunk to determine the covariance between the bristle length in
+    the mothers, and the offspring mean.** Look back at the 'covariance' section if you need a
+    reminder on how to do this.
+
+```{r narrow-sense4}
+covariance<-
+```
+
+Now we need to determine the total phenotypic variance ($V_x$). We can use the R `append` function
+to join the two columns of the bristle_lengths dataframe into one vector, then determine the overall
+variance within the data.
+
+-   Complete the following code chunk to determine the variance of the `all` list.
+
+```{r narrow-sense6}
+all=append(bristle_length$mother,bristle_length$offspring_mean)
+Vx<-
+```
+
+Next we just need to put everything together. $$h^2=\frac{2COV_{p,o}}{V_x}$$
+
+We have already determined $COV_{p,o}$ which should be stored in the `covariance` variable, so we
+just need to multiply this by 2, and divide it by $V_x$
+
+-   Complete the following code chunk to determine $h^2$, and print the result
+
+```{r narrow-sense7}
+h2<-
+h2
+```
+
+What does this tell us about the inheritance of the bristle length phenotype?
+
+### Predicting Phenotypes
+
+We can predict the phenotype of the offspring of a cross if we know the narrow-sense heritability
+($h^{2}$) with the breeder's equation:
+
+$$\hat{x}_{o} = h^{2}(\frac{x^{'}+x^{''}}{2})$$
+
+or
+
+$$\hat{x}_o = h^2\bar{x}_p$$
+
+where $\hat{x}_{o}$ represents the offspring's phenotypic deviation from the mean, and $x^{'}$ and
+$x^{''}$ are the parent's additive deviations and $\bar{x}_p$ represents the mean parental deviation
+from the mean.
+
+This is also sometimes shown in Lush's original form:
+
+$$R=h^{2}S$$
+
+where $R$ represents the response, and $S$ is the selection differential.
+
+### Wheat Yield Exercise
+
+Wheat has an average yield of 3.4 tonnes per hectare.
+
+We cross two varieties, which have yields of 3.1 and 3.8 tonnes per hectare respectively. The
+narrow-sense heritability ($h^{2}$) of the trait is 0.63 What do we expect the yield of the
+offspring of the cross to be?
+
+-   **Run the below code chunk which will store these values in the mean_yield, yield1, yield2 and
+    h2 variables.**
+
+```{r yield1}
+mean_yield<-3.4
+yield1<-3.1
+yield2<-3.8
+h2<-0.63
+```
+
+First, find the deviance of the parental phenotypes from the mean. Deviation of the sample from the
+mean can be found with $$x = X-\overline{x}$$
+
+where $X$ is the yield for the variety, and $\bar{x}$ is the mean yield.
+
+-   **Compete the code chunk below to determine the variance of each parent's yield from the mean**
+
+```{r yield2}
+x1<-
+x2<-
+```
+
+We can now determine the parental mean deviation ($\bar{x}_{p}$) by passing a list of the parental
+deviations i.e. `c(x1,x2)` to the `mean()` function.
+
+-   **Complete the code chunk below to determine the mean of x1 and x2 and store it as `mean_xp`**
+
+```{r yield3}
+mean_xp<-
+```
+
+Now we have determined $\overline{x}_{p}$, and we know the proportion of additive genetic variation
+(the narrow-sense heritability $h^{2}$) we can put these into the Breeders equation
+$$\hat{x}_o = h^2\bar{x}_p$$ which will give us the offspring's phenotypic deviation from the mean
+($\hat{x}_{o}$)
+
+-   **Complete the code chunk below to determine** $\hat{x_o}$
+
+```{r yield4}
+xo<-
+```
+
+Finally, since we now know the expected deviation of the offsprings yield from the mean yield, we
+can just add these together to see what the expected yield of the results of this cross would be
+
+```{r yield5}
+predicted_yield<-xo + mean_yield
+cat('Predicted yield', predicted_yield, '\n')
+```
+
+## QTL Mapping: Hypertension in mice
+
+### Background
+
+This exercise carries out a QTL analysis of a dataset investigating hypertension in mice. The
+purpose of the exercise is to walk you through the process of QTL mapping using the `qtl` R library
+which does all the hard work for us. You won't be expected to write any R code for this - it is all
+provided for you, so you just need to run each code block as you work through the exercise.
+
+The dataset is one of the example sets available as part of the `qtl` library which was published in
+[Sugiyama et al.
+(2001)](https://www.sciencedirect.com/science/article/pii/S0888754300964012?via%3Dihub){.uri}.
+
+This study aimed to identify loci associated with salt-induced hypertension in mice. Backcrosses
+were carried out between salt-sensitive and salt-insensitive inbred strains. The drinking water
+provided to the mice contained 1% NaCl and after 14 days, blood pressure measurements were taken
+every day for 5 days, and averaged.The mice were then genotyped at a total of 174 markers.
+
+### QTL Data
+
+The raw data used in this exercise is available as a csv file in the module materials: hyper.csv.
+You can open this in Excel to see what the data looks like, but a small section is show below.
+
+| bp    | sex  | D1Mit296 | D1Mit123 | D1Mit156 |
+|-------|------|----------|----------|----------|
+|       |      | 1        | 1        | 1        |
+|       |      | 3.3      | 19.7     | 32.8     |
+| 109.6 | male | BA       | BA       | BA       |
+| 109.8 | male | BA       | BA       | BA       |
+| 110.1 | male | BB       | BB       | BB       |
+
+The first two columns contain the phenotypic data - in this case, the mean of the recorded blood
+pressures readings for the individual mouse, and it's sex.
+
+The remaining columns contain the genotyping data. Each column has the marker name in the first row,
+followed by the chromosome it is located on, and then it's position on the chromosome in cM. For
+each of the remaining rows, the genotype of the marker in each mouse is expressed as 'AA', 'AB',
+'BA' or 'BB'.
+
+The data is already available in your R session as an object named `hyper`. The `summary` R command
+will give us some details about the data.
+
+```{r}
+summary(hyper)
+```
+
+The `plot` function which will provide an easy visualistion of the data for us to give us a feel for
+what it looks like.
+
+```{r}
+plot(hyper)
+```
+
+This can be hard to make out with overlapping labels, but there are three icons at the top right of
+the plot. Clicking the left-hand one of these will open the plot in a separate window then it can be
+made full screen.
+
+The first plot indicates where there are missing genotypes in the data, and is pretty impossible to
+interpret unless made very large. Second (top right) is the genetic map, indicating the marker
+locations on the chromosomes. This study dates from before the mouse genome was available, so marker
+density is a lot lower than it would be in a modern study. A lower marker density means the trait
+will be mapped less precisely. The lower two plots are showing the recorded phenotypes, firstly
+blood pressure (bp), which appears to be normally distributed. The second indicates the sex of the
+mice in the study. These are all male, as a result of the experimental design, since male mice of
+the salt-sensitive strain show a stronger effect than females. This also makes our lives easier,
+since in a mixed population of males and females we need to account for the X and Y chromosomes
+differently.
+
+We can inspect the raw phenotype data by viewing the \`pheno\` element of the \`hyper\` object. This
+is a data frame i.e. a table, with named columns. The \`View\` command opens this in a new tab in
+RStudio for us to look at.
+
+```{r eval=FALSE, include=TRUE}
+View(hyper$pheno)
+```
+
+We can drop any markers which have no genotype data to clean up the dataset a bit. The
+`drop.nullmarkers()` function of the `qtl` package returns a modified version of the 'hyper' object,
+so we can store this back into the 'hyper' variable.
+
+```{r}
+hyper<-drop.nullmarkers(hyper)
+summary(hyper)
+```
+
+Errors in genotyping are not uncommon. The `calc.genoprob()` function of the `qtl` package uses a
+statistical model called a Hidden Markov Model (HMM) to determine the probabilities of the true
+genotypes given the observed data. This function again stores it's outputs in the object, so we
+reassign this back to 'hyper' again. The 'step' argument to `calc.genoprob()` indicates the maximum
+genetic distance (in centimorgans) between which probabilities are determined, while error.prob
+defines the assumed error rate in the genotyping.
+
+```{r}
+hyper<-calc.genoprob(hyper, step=1, error.prob=0.01)
+```
+
+We can now carry out a scan of the genome to identify QTLs, using the `scanone()` function, and
+assign the returned data to the variable `results`.
+
+```{r}
+results<-scanone(hyper)
+```
+
+Remember from the lecture that the LOD score is the log of the ratio of the probability that there
+is a QTL present at the locus to the probability that there is not a QTL present at the locus:
+
+$$LOD = log_{10}\left(\frac{Prob(data|QTL)}{Prob(data|noQTL)}\right)$$
+
+As a log10 value, a LOD score of 2 equates to a ration of 1:100, while LOD 3 = 1:1000 and so on.
+
+We can get an overview of the outputs by passing the results from the scan to the `summary()`
+function. This reports the marker with the highest LOD score on each chromosome in the first column,
+followed by the chromosome, position (in cM) and LOD score.
+
+```{r results='markup'}
+summary(results)
+```
+
+You can see the full contents of the results with the \`View\` command, which will display same
+details for every marker on the genome:
+
+```{r eval=FALSE, include=TRUE}
+View(results)
+```
+
+The \`plot\` command can also produce a plot of the genome scan results for us, with the chromosomes
+indicated on the \$x\$ axis, and the LOD score on the \$y\$.
+
+```{r}
+plot(results, bandcol="gray95")
+```
+
+### Permutation Testing
+
+This shows us that there are a number of peaks in LOD score, which may indicate QTLs. The
+`scanone()` function also includes the ability to run a permutation test. A permutation test measure
+every possible rearrangement of the observed data and assesses it statistically to determine the
+'background noise' in the data. This enables the significance threshold of our data to be determined
+i.e. the LOD score above which results are not likely to have occurred by chance. The normal cutoff
+used to establish significance is 5% ($p<0.05$), which means that for every 100 observations above
+the LOD threshold, 5 of these would be expected to have occurred by chance.
+
+There is a nice introduction to permutation tests involving washing alpacas
+[here](https://www.jwilber.me/permutationtest/){.uri} if you are interested in learning more.
+
+To run the permutation test, we just need to use the `n.perm` argument to tell `scanone()` how many
+permutations to run. 1000 would be ideal, but this is pretty slow so we'll just go for 100 - this
+will take a minute or so to run.
+
+```{r results='hide'}
+perms<-scanone(hyper, n.perm=100)
+```
+
+If we use the \`plot\` function to visualise the results of the permutation test we will see the LOD
+scores on the $x$ axis, and the frequency on the $y$ axis. The majority of the data fits into a
+normal distribution, with a tail on the right-hand side with a LOD score above three. Values which
+fall outside the normal distribution data are indicative of where the LOD cut-off is going to be,
+which looks to be around 3.
+
+```{r include=TRUE}
+plot(perms)
+```
+
+We can find the exact value of the LOD threshold by running the `summary` function, using the
+`alpha` argument to define the p-value cut-off to use.
+
+```{r include=TRUE}
+summary(perms,alpha=0.05)
+```
+
+This shows that the actual significance threshold for a p-value of 0.05 is a LOD score somewhere
+around 2.6 to 2.9 - this value will vary slightly since we ran a limited number of permutations -
+running a higher number of permutations would produce a more reliable result.
+
+The `summary()` function can also use the results of the permutation test to select the markers with
+the highest LOD score on each chromosome which exceed the specified significance threshold. We pass
+the `results` object to the function, along with the results of the permutation test (`perms`), the
+significance threshold to use (`alpha`) and also request that it reports the p-values of the
+selected markers.
+
+```{r include=TRUE}
+summary(results,
+  perms=perms,
+  alpha=0.05,
+  pvalues=TRUE)
+```
+
+This gives us two markers which meet our significance threshold and seem to be associated with the
+trait. The authors of the original paper used some rather more sophisticated techniques and were
+able to identify 6 loci associated with the trait, but four of these are not statistically
+significant using the approach we have used here.
+
+We can now take a look at where out QTLs are on the genetic map. First we have to construct a `qtl`
+object containing the locations of our loci. We pass this the original dataset (`hyper`) which
+includes the genetic map data. and pass it a list of the chromosomes (`chr`) carrying the loci, and
+there positions (`pos`). The `what` argument allows you to select what to include in the qtl
+object - we want to use `prob` to indicate we want the probabilities including.
+
+```{r}
+qtl<-makeqtl(hyper,
+  chr=c('1', '4'),
+  pos=c(48.3, 29.5),
+  what='prob')
+```
+
+We will create separate plots for each chromosome since they can get quite 'busy' with overlapping
+labels. Just as with the previous command we pass a list of chromosomes to plot as \`chr\`, and I've
+also set show.marker.names to TRUE to label the markers. If you want a clearer picture you can
+remove the marker names by setting \`show.marker.names=FALSE\` instead.
+
+```{r}
+plot(qtl,show.marker.names=TRUE, chr=c(1))#, justdots=TRUE)
+plot(qtl,show.marker.names=TRUE, chr=c(4))#, justdots=TRUE)
+```
+
+We now have identified two loci potentially linked with our trait, which can be used in future work
+to try to narrow down the genes involved.
