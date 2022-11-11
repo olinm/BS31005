@@ -102,7 +102,7 @@ an argument, and the calculation is done for us.
 -   **Call the `mean()`** **function and pass it the `heights` list**
 
 ```{r mean}
-
+mean(heights)
 ```
 
 If we are working with data in a data frame, We can find the mean of the rows with `rowMeans` and
@@ -112,14 +112,14 @@ the mean of the columns with `colMeans`.
     results as a list.
 
 ```{r df_rowmeans}
-
+rowMeans(bristle_length)
 ```
 
 -   **Similarly, call `colMeans()` and pass it the `bristle_length` data frame.** This time the
     results will be returned as a named list
 
 ```{r df_colmeans}
-
+colMeans(bristle_length)
 ```
 
 ### Variance
@@ -131,7 +131,7 @@ $$V_x = \frac{1}{n}\sum_{i}(X_i-\bar{X})^2$$ Similarly, R can do the hard work f
 -   **Call the `var()` function, passing it the `heights` list.**
 
 ```{r variance}
-
+var(heights)
 ```
 
 ### Covariance
@@ -146,7 +146,7 @@ results as a matrix.
 -   **Call the `cov()` function and pass it the bristle_length data frame.**
 
 ```{r covariance}
-
+cov(bristle_length)
 ```
 
 We can also obtain the covariance of a single combination of variable by providing the `cov()`
@@ -156,7 +156,7 @@ function with two vectors, or columns of data from the data frame (i.e. `bristle
     arguments i.e. `cov(column1, column2)`
 
 ```{r covariance_of_vectors}
-
+cov(bristle_length$mother, bristle_length$offspring_mean)
 ```
 
 ### Broad-Sense Heritability
@@ -194,8 +194,8 @@ respectively.
 -   **Complete the code cell below to capture the environment means and line means**
 
 ```{r broad-sense2}
-environment_means<-
-line_means<-
+environment_means<- colMeans(pollen_shed_expt)
+line_means<- rowMeans(pollen_shed_expt)
 ```
 
 Next, we can determine the genetic variance ($V_g$) and environmental mean ($V_e$) from these
@@ -205,8 +205,8 @@ vectors of mean values.
     function called with `line_means` as `Vg` and the `environment_means` results as `Ve`.**
 
 ```{r broad-sense3}
-Vg<-
-Ve<-
+Vg<- var(line_means)
+Ve<- var(environment_means)
 ```
 
 Since $V_x = V_g + V_e$ and have now determined these values, which can find $V_x$ by adding these
@@ -215,7 +215,7 @@ values together
 -   Complete the following code chunk to determine $V_x$
 
 ```{r}
-Vx<-
+Vx<- Vg+Ve
 ```
 
 Now we can put these values into the broad-sense heriditary equation $$
@@ -227,12 +227,15 @@ $$
 
 ```{r broad-sense4}
 
-H2<-
+H2<-Vg/Vx
 H2
 
 ```
 
 Does the environment or genetic effects constitute the main source of variance in this data set?
+
+The closer the index to 1 the more important the genetic factors are. In this example, H2 is at
+0.77, so genetic factors would be the main source of variance here.
 
 ### Narrow-sense heritability
 
@@ -282,7 +285,7 @@ the covariance between the parents and offspring ($COV_{p,o}$).
     reminder on how to do this.
 
 ```{r narrow-sense4}
-covariance<-
+covariance<- cov(bristle_length$mother, bristle_length$offspring_mean)
 ```
 
 Now we need to determine the total phenotypic variance ($V_x$). We can use the R `append` function
@@ -293,7 +296,7 @@ variance within the data.
 
 ```{r narrow-sense6}
 all=append(bristle_length$mother,bristle_length$offspring_mean)
-Vx<-
+Vx<- var(all)
 ```
 
 Next we just need to put everything together. $$h^2=\frac{2COV_{p,o}}{V_x}$$
@@ -304,11 +307,14 @@ just need to multiply this by 2, and divide it by $V_x$
 -   Complete the following code chunk to determine $h^2$, and print the result
 
 ```{r narrow-sense7}
-h2<-
+h2<- (2*covariance)/Vx
 h2
 ```
 
 What does this tell us about the inheritance of the bristle length phenotype?
+
+Since h2 is 0.97, very close to 1, it tells us that the genetic factor is quite important and it is
+responsible for most of the variance.
 
 ### Predicting Phenotypes
 
@@ -357,8 +363,8 @@ where $X$ is the yield for the variety, and $\bar{x}$ is the mean yield.
 -   **Compete the code chunk below to determine the variance of each parent's yield from the mean**
 
 ```{r yield2}
-x1<-
-x2<-
+x1<- yield1-mean_yield
+x2<- yield2-mean_yield
 ```
 
 We can now determine the parental mean deviation ($\bar{x}_{p}$) by passing a list of the parental
@@ -367,7 +373,7 @@ deviations i.e. `c(x1,x2)` to the `mean()` function.
 -   **Complete the code chunk below to determine the mean of x1 and x2 and store it as `mean_xp`**
 
 ```{r yield3}
-mean_xp<-
+mean_xp<- mean(c(x1,x2))
 ```
 
 Now we have determined $\overline{x}_{p}$, and we know the proportion of additive genetic variation
@@ -378,7 +384,7 @@ $$\hat{x}_o = h^2\bar{x}_p$$ which will give us the offspring's phenotypic devia
 -   **Complete the code chunk below to determine** $\hat{x_o}$
 
 ```{r yield4}
-xo<-
+xo<- h2*mean_xp
 ```
 
 Finally, since we now know the expected deviation of the offsprings yield from the mean yield, we
@@ -600,8 +606,8 @@ also set show.marker.names to TRUE to label the markers. If you want a clearer p
 remove the marker names by setting \`show.marker.names=FALSE\` instead.
 
 ```{r}
-plot(qtl,show.marker.names=TRUE, chr=c(1))#, justdots=TRUE)
-plot(qtl,show.marker.names=TRUE, chr=c(4))#, justdots=TRUE)
+plot(qtl,show.marker.names=FALSE, chr=c(1))#, justdots=TRUE)
+plot(qtl,show.marker.names=FALSE, chr=c(4))#, justdots=TRUE)
 ```
 
 We now have identified two loci potentially linked with our trait, which can be used in future work
